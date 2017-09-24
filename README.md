@@ -9,6 +9,9 @@ Server side example:
 	using namespace neusc;
 	Server *server = new Server();
 	ServerEvents events;
+
+	server->set_config_on(Server::RESPONSE_ORDERLY);
+
 	events.onConnect = [](int handle, const char* ipaddr) {
 		std::cout << "connection establish, from "  << ipaddr << std::endl;
 		return true;
@@ -48,6 +51,10 @@ Client side (SYNC mode) example:
 /* send out request 2 */
 /* send out request 3 */
 /* .... */
+
+/* if you don't set config RESPONSE_ORDERLY, 
+   the response might not be same order as sending 
+*/
 
 /* receive response I */
 	std::string reply;

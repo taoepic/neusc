@@ -1,4 +1,4 @@
-CFLAGS=-std=c++11 -Wall
+CFLAGS=-std=c++14 -Wall
 INCLUDES= 
 BINS=client_test1 client_test2 server_test
 BASEOBJS=neusc_server.o neusc_clientsync.o 

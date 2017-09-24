@@ -7,39 +7,45 @@ using namespace std;
 
 const int PORT = 23456;
 
-void onRequest(Request* request) {
-	int request_size = request->get_size();
-	const char *request_ptr = request->get_ptr();
-
-	cout << "(" << request_size << ")" << endl;
-	request->clone_response(request_size, request_ptr);
-	request->end_response();
-}
-
 int main () {
 	Server* server = new Server();
-	ServerEvents events;
+	server->set_listen_address("0.0.0.0");
 
 	//server->set_work_thread_count(4);
-	server->set_listen_address("0.0.0.0");
-	events.onInit = []() {
-		cout << "server init" << endl;
-		return true;
+	//server->set_config_on(Server::RESPONSE_ORDERLY);
+
+	ServerEvents events = {
+		.onInit = []() {
+			cout << "server init" << endl;
+			return true;
+		},
+		.onEnd = []() {
+			cout << "server end" << endl;
+		},
+		.onConnected = [](int handle, const char* ipaddr) {
+			cout << "connection establish (" << handle << ") ip: " << ipaddr << endl;
+			return true;
+		},
+		.onPeerReset = [](int handle) {
+			cout << "connection abort (" << handle << ")" << endl;
+		},
+		.onPeerClosed = [](int handle) {
+			cout << "connection closed (" << handle << ")" << endl;
+		},
+		.onRequest = [](Request *request) {
+			int request_size = request->get_size();
+			const char *request_ptr = request->get_ptr();
+
+			cout << "(" << request_size << ")" << endl;
+			request->clone_response(request_size, request_ptr);
+
+			/* now you can release request buffer */
+			request->release_request_data();
+
+			/* prepare response for sending out */
+			request->end_response();
+		}
 	};
-	events.onEnd = []() {
-		cout << "server end" << endl;
-	};
-	events.onConnected = [](int handle, const char* ipaddr) {
-		cout << "connection establish (" << handle << ") ip: " << ipaddr << endl;
-		return true;
-	};
-	events.onPeerReset = [](int handle) {
-		cout << "connection abort (" << handle << ")" << endl;
-	};
-	events.onPeerClosed = [](int handle) {
-		cout << "connection closed (" << handle << ")" << endl;
-	};
-	events.onRequest = onRequest;
 
 	cout << "server start @" << PORT << endl;
 	server->ready(PORT, events);

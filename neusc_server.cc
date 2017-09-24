@@ -104,8 +104,8 @@ void Request::release_request_data() {
 	}
 }
 
-Response::Response(Request *r) : 
-		request(r), data(nullptr), body_has_written(0), length_has_written(0) {
+Response::Response(Request *r) : request(r), data(nullptr), 
+			body_has_written(0), length_has_written(0) {
 	memset(length_buf, 0, 4);
 }
 
@@ -162,7 +162,7 @@ void Response::write_data(int handle, Server* server) {
 
 bool volatile Server::exit_flag = false;
 
-Server::Server() : listen_address("0.0.0.0") {
+Server::Server() : listen_address("0.0.0.0"), config(0) {
 	work_thread_count = sysconf(_SC_NPROCESSORS_ONLN) * 2;
 }
 
@@ -272,7 +272,7 @@ void Server::clear_handle(int handle) {
 				it = mature_list.list.erase(it);
 			} else {
 				/* mark discard at not mature request, will be delete 
-					on sending list picking 
+				 * on sending list picking 
 				*/
 				(*it)->discard = true;
 				++it;
@@ -319,11 +319,7 @@ Request* Server::move_sending_request(int handle) {
 	std::list<Request*>::iterator it = mature_list.list.begin();
 	while (it != mature_list.list.end()) {
 		request = *it;
-		if (!request->matured) {
-			++it;
-			continue;
-		}
-		if (request->discard) {
+		if (request->discard && request->matured) {
 			it = mature_list.list.erase(it);
 			delete request;
 			continue;
@@ -331,6 +327,18 @@ Request* Server::move_sending_request(int handle) {
 		if (request->handle != handle) {
 			++it;
 			continue;
+		} 
+		if (!request->matured) {
+			/* if ORDERLY response is set, 
+			 *	have to wait the first mature, so return nullptr
+			*/
+			if (config & RESPONSE_ORDERLY) {
+				mature_list.unlock();
+				return nullptr;
+			} else {
+				++it;
+				continue;
+			}
 		}
 		mature_list.list.erase(it);
 		sending_map[handle] = request;
@@ -410,6 +418,13 @@ void Server::release_remain() {
 	std::for_each(mature_list.list.begin(), mature_list.list.end(), [](Request* r) {
 		delete r;
 	});
+}
+
+void Server::dump_state() {
+	cout << "Conn: " << premature_map.size();
+	cout << " Unprocess: " << pending_list.list.size();
+	cout << " WaitSend: " << mature_list.list.size();
+	cout << endl;
 }
 
 static void server_interrupt(int) {

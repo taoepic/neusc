@@ -35,13 +35,13 @@ class Response;
 
 struct ServerEvents {
 	/* onInit return return false to stop server starting */
-	bool (*onInit)() = nullptr;
-	void (*onEnd)() = nullptr;
+	std::function<bool()> onInit = nullptr;
+	std::function<void()> onEnd = nullptr;
 	/* onConnected return false to stop connection */
-	bool (*onConnected)(int handle, const char* ipaddr) = nullptr;
-	void (*onPeerReset)(int handle) = nullptr;
-	void (*onPeerClosed)(int handle) = nullptr;
-	void (*onRequest)(Request *) = nullptr;
+	std::function<bool(int, const char*)> onConnected = nullptr;
+	std::function<void(int)> onPeerReset = nullptr;
+	std::function<void(int)> onPeerClosed = nullptr;
+	std::function<void(Request*)> onRequest = nullptr;
 };
 
 class Response {
@@ -87,14 +87,16 @@ public:
 	void clone_response(int size, const char* buf);
 
 	/* NOTE: refer data can eliminate copy of data, 
-		but will be released by response as delete[] data 
+	 *	but will be released by response as delete[] data 
     */
 	void refer_response(int size, const char* buf);
 
 	/* set response mature for reply out */
 	void end_response();
 
-	/* release request data, only can be used when have got the request data in word queue */
+	/* release request data, only can be used when have got 
+	 *	the request data in word queue 
+	*/
 	void release_request_data();
 
 	/* get response ptr */
@@ -114,7 +116,7 @@ protected:
 	int handle;
 
 	/* the request in mature_list, if matured & discard, 
-		request will be deleted immediate 
+	 *	request will be deleted immediate 
 	*/
 	volatile bool matured;
 	bool discard;
@@ -148,10 +150,16 @@ class Server {
 	friend class Request;
 	friend class Response;
 public:
+	enum : unsigned char {
+		RESPONSE_ORDERLY = 1,
+	};
 	Server();
 	int ready(int listen_port, const ServerEvents& on_event);
 	void set_work_thread_count(int c) { work_thread_count = c; }
 	void set_listen_address(const std::string& a) { listen_address = a; }
+	void set_config_on(unsigned char c) { config |= c; }
+	void set_config_off(unsigned char c) { config &= ~c; }
+	void dump_state();
 	static void prepare_exit();
 
 protected:
@@ -186,6 +194,7 @@ protected:
 	ServerEvents server_events;
 	int work_thread_count;
 	std::string listen_address;
+	unsigned char config;
 
 	std::unordered_map<int,Request*> premature_map;
 	std::unordered_map<int,Request*> sending_map;
