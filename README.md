@@ -22,12 +22,13 @@ Server side example:
 	events.onPeerClose = [](int handle) {
 		std::cout << "connection closed." << std::endl;
 	};
-	events.onRequest = [](Request* request) {
+	events.onRequest = [](Request* request) -> bool {
 		int req_size = request->get_size();
 		const char* req_ptr = request->get_ptr();
 
 		request->clone_response(req_size, req_ptr);
 		request->end_response();
+		return true;
 	};
 
 	server->ready(LISTEN_PORT, events);

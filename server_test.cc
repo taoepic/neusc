@@ -15,11 +15,11 @@ int main () {
 	//server->set_config_on(Server::RESPONSE_ORDERLY);
 
 	ServerEvents events = {
-		.onInit = []() {
+		.onInit = [](Server* s) {
 			cout << "server init" << endl;
 			return true;
 		},
-		.onEnd = []() {
+		.onEnd = [](Server* s) {
 			cout << "server end" << endl;
 		},
 		.onConnected = [](int handle, const char* ipaddr) {
@@ -32,7 +32,7 @@ int main () {
 		.onPeerClosed = [](int handle) {
 			cout << "connection closed (" << handle << ")" << endl;
 		},
-		.onRequest = [](Request *request) {
+		.onRequest = [](Request *request) -> bool {
 			int request_size = request->get_size();
 			const char *request_ptr = request->get_ptr();
 
@@ -44,6 +44,9 @@ int main () {
 
 			/* prepare response for sending out */
 			request->end_response();
+
+			/* must return true if it has response to send back */
+			return true;
 		}
 	};
 

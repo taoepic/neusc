@@ -34,14 +34,28 @@ class Request;
 class Response;
 
 struct ServerEvents {
-	/* onInit return return false to stop server starting */
-	std::function<bool()> onInit = nullptr;
-	std::function<void()> onEnd = nullptr;
+	/* onInit return return false to stop server starting process */
+	std::function<bool(Server*)> onInit = nullptr;
+	std::function<void(Server*)> onEnd = nullptr;
+
 	/* onConnected return false to stop connection */
 	std::function<bool(int, const char*)> onConnected = nullptr;
 	std::function<void(int)> onPeerReset = nullptr;
 	std::function<void(int)> onPeerClosed = nullptr;
-	std::function<void(Request*)> onRequest = nullptr;
+
+	/* onRequest return false indicates nothing to reponse to client 
+	 * must return true if you have response to send back.
+	*/
+	std::function<bool(Request*)> onRequest = nullptr;
+
+	/* onPick gives a pending_list for choosing a request for work thread to process,
+	 * the list must not lock again because it has locked. the function needs to
+	 * return the select request's iterator. you can delete the item which you don't
+	 * want to process, but you should be careful that will make a result of 
+	 * no response to client.
+	 * If onPick set to nullptr, default process will select the first item to continue
+	*/
+	std::function<std::list<Request*>::iterator(std::list<Request*>)> onPick = nullptr;
 };
 
 class Response {
@@ -178,9 +192,6 @@ protected:
 	void epoll_add_socket(int sock, int op);
 	void epoll_delete_socket(int sock);
 	void epoll_modify_socket(int sock, int op);
-
-	/* default request reponse with 1 byte '\0' */
-	void default_request_process(Request* request);
 
 	constexpr static const int LISTENQ = 20;
 	constexpr static const int EVENTSIZE = 1000;

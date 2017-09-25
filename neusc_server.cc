@@ -177,8 +177,15 @@ void Server::thread_process() {
 			});
 			if (exit_flag)
 				return;
-			request = pending_list.list.front();
-			pending_list.list.pop_front();
+			if (server_events.onPick) {
+				std::list<Request*>::iterator it = server_events.onPick(pending_list.list);
+				request = *it;
+				pending_list.list.erase(it);
+			} else {
+				/* default choose first one to process */
+				request = pending_list.list.front();
+				pending_list.list.pop_front();
+			}
 
 			mature_list.lock();
 			mature_list.list.push_back(request);
@@ -187,10 +194,9 @@ void Server::thread_process() {
 
 		request->response = new Response(request);
 		assert(request->response);
-		if (server_events.onRequest) {
-			server_events.onRequest(request);
-		} else {
-			default_request_process(request);
+		if (!server_events.onRequest || !server_events.onRequest(request)) {
+				request->discard = true;
+				request->matured = true;
 		}
 	}
 }
@@ -388,15 +394,6 @@ void Server::epoll_modify_socket(int sock, int op) {
 	::epoll_ctl(epoll_fd, EPOLL_CTL_MOD, sock, &ev);
 }
 
-/*
- * default_request_process, called from work thread
-*/
-void Server::default_request_process(Request* request) {
-	char null_string = 0;
-	request->clone_response(1, &null_string);
-	request->end_response();
-}
-
 void Server::prepare_exit() {
 	exit_flag = true;
 }
@@ -437,7 +434,7 @@ int Server::ready(int listen_port, const ServerEvents& on_events) {
 	signal(SIGQUIT, server_interrupt);
 	server_events = on_events;
 
-	if (on_events.onInit && !on_events.onInit()) {
+	if (on_events.onInit && !on_events.onInit(this)) {
 		return 1;
 	}
 	int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -557,7 +554,7 @@ int Server::ready(int listen_port, const ServerEvents& on_events) {
 	});
 	release_remain();
 	if (on_events.onEnd)
-		on_events.onEnd();
+		on_events.onEnd(this);
 	return 0;
 }
 
